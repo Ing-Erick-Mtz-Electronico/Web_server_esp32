@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bolla Oceanografica</title>
+    
+    <style>
+        *{
+        margin: 0;
+        padding: 0;
+
+        }
+        .titulo{
+            color: rgb(0, 0, 0);
+            border: 3px solid rgba(235, 17, 17, 0.1);
+            font-family: 'peppins',sans-serif;
+            text-align: center;
+            font-size: 30px;
+        }
+        .tema{
+            color: rgb(0, 0, 0);
+            font-family: 'peppins',sans-serif;
+            font-size: 20px;
+            text-align: center;
+            line-height: 25px;
+        }
+        h2{
+            color: rgb(0, 0, 0);
+            font-family: 'peppins',sans-serif;
+            font-size: 20px;
+            text-align: center;
+            line-height: 25px;
+        }
+        
+        .contenedor{
+            align-content: center;
+            justify-content: center;
+            display: grid;
+            height: 30vh;
+        }
+
+        .btn{
+            border: 3px solid rgba(100,100,100,0.1);
+            margin-bottom: 20px;
+            padding: 20px;
+            width: 300px;
+            font-weight: bolder;
+            font-family: 'peppins',sans-serif;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: #fff;
+            background-size: 300%;
+        }
+        .btn:hover{
+            background-position: right;
+        }
+        .bt1{
+            background-image: linear-gradient(to left,#00B7DA,#161569,#00B7DA);
+        }
+        .bt2{
+            background-image: linear-gradient(to left ,#A950A1,#2D3A54,#A950A1);
+        }
+    </style>
+
+</head>
+<body>
+    <br>
+    <h1 class="titulo">GRUPO DE INVESTIGACIÓN<br>GIDEAM</h1><br>
+
+    <h1 class="tema">MONITOREO DE VARIABLES AMBIENTALES<br>EN LA CIUDAD DE SANTA MARTA</h1>
+    <br><br>
+    <h2>ELIJA UNA OPCIÓN</h2>
+
+    <div class="contenedor">
+        <a href="tiempo_real/"><button class="btn bt1">MONITOREO EN TIEMPO REAL</button></a>
+        <a href="historial/"><button class="btn bt2">HISTORIAL DE MONITOREO</button></a>
+    </div>
+    
+</body>
+
+</html>
+
