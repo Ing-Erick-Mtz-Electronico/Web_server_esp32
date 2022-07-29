@@ -7,7 +7,9 @@ The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software. -->
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://code.highcharts.com/stock/highstock.js"></script>
+  <script src="https://code.highcharts.com/stock/modules/data.js"></script>
+  <script src="https://code.highcharts.com/modules/accessibility.js"></script>
   <style>
     body {
       min-width: 310px;
@@ -71,7 +73,7 @@ setInterval(function ( ) {
       }
     }
   };
-  xhttp.open("GET", "/temperature", true);
+  xhttp.open("GET", "/tiemporeal/temperature", true);
   xhttp.send();
 }, 30000 ) ;
 
@@ -110,7 +112,7 @@ setInterval(function ( ) {
       }
     }
   };
-  xhttp.open("GET", "/humidity", true);
+  xhttp.open("GET", "/tiemporeal/humidity", true);
   xhttp.send();
 }, 30000 ) ;
 
@@ -150,7 +152,7 @@ setInterval(function ( ) {
       }
     }
   };
-  xhttp.open("GET", "/pressure", true);
+  xhttp.open("GET", "/tiemporeal/pressure", true);
   xhttp.send();
 }, 30000 ) ;
 
@@ -190,7 +192,7 @@ setInterval(function ( ) {
       }
     }
   };
-  xhttp.open("GET", "/altitude", true);
+  xhttp.open("GET", "/tiemporeal/altitude", true);
   xhttp.send();
 }, 30000 ) ;
 

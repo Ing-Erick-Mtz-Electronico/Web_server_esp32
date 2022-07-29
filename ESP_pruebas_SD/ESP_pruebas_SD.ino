@@ -8,8 +8,14 @@
 #include <FSImpl.h>
 #include <vfs_api.h>
 
-
-
+#include <Wire.h>
+#include <RTClib.h>
+ 
+// Declaramos un RTC DS3231
+RTC_DS1307 rtc;
+DateTime now;
+char str[20];
+String fecha_data = "";
 
 
 // Código para el nodo de Sistemas Inteligentes
@@ -21,7 +27,8 @@
 #include <Adafruit_BME280.h>
 
 #define SEALEVELPRESSURE_HPA (1013.25)
-#define PATH ("/prueba3.json")
+#define PATH ("/prueba4.json")
+#define BME_ADDRESS (0x76)
 
 Adafruit_BME280 bme;
 
@@ -36,10 +43,7 @@ float temperature, humidity, pressure, altitude;
 void setup() {
   Serial.begin(115200);
   delay(100);
-
-  bme.begin(0x76);
   
-  boolean band = false;
   String init = "{\"mediciones\":[";
   //server.on("/hola/", handle_OnConnect);
   //server.onNotFound(handle_NotFound);
@@ -53,6 +57,21 @@ void setup() {
     delay(2000);
   }
   Serial.println("Inicialización lista.");
+
+  while(!rtc.begin()){
+    Serial.println("No hay un módulo RTC conectado");
+    delay(2000);
+    }
+  Serial.println("RTC conectada");
+  
+  while(!bme.begin(BME_ADDRESS)){
+    Serial.println("No hay un módulo BME conectado");
+    delay(2000);
+    }
+  Serial.println("BME conectado");
+  
+  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  
   //deleteFile(SD, PATH);
 
   if(checkFile(SD, PATH)){
@@ -164,6 +183,13 @@ void appendFile(fs::FS &fs, const char * path, const char * message){
   file.close();
 }
 
+String fecha() {
+  now = rtc.now();
+  sprintf(str, "\"%02d-%02d-%02dT%02d:%02d:%02d\"",  now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+  Serial.println(str);
+  return str;
+  
+}
 
 void loop() {
   
@@ -171,6 +197,7 @@ void loop() {
   humidity = bme.readHumidity();
   pressure = bme.readPressure() / 100.0F;
   altitude = bme.readAltitude(SEALEVELPRESSURE_HPA);
+  fecha_data = fecha();
   
   Serial.print("Temperatura = "); 
   Serial.println(temperature);
@@ -180,6 +207,8 @@ void loop() {
   Serial.println(pressure);
   Serial.print("Altitud = ");
   Serial.println(altitude);
+  Serial.print("fecha = ");
+  Serial.println(fecha_data);
   
   String object_med = "{";
   object_med.concat("\"temperatura\":");
@@ -190,6 +219,8 @@ void loop() {
   object_med.concat(String(pressure));
   object_med.concat(",\"altitud\":");
   object_med.concat(String(altitude));
+  object_med.concat(",\"fecha\":");
+  object_med.concat(fecha_data);
   object_med.concat("}");
   object_med.concat(",");
   

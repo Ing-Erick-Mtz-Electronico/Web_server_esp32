@@ -26,10 +26,10 @@
             <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
                 <ul class="navbar-nav">
                 <li class="nav-item">
-                    <a class="nav-link active" aria-current="page" href="/tiempo_real.html">Tiempo real</a>
+                    <a class="nav-link active" aria-current="page" href="/tiemporeal">Tiempo real</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="/historial.html">Historial</a>
+                    <a class="nav-link" href="/historial">Historial</a>
                 </li>
                 </ul>
             </div>
@@ -144,9 +144,7 @@
         title: {
             text: 'Humedad'
         },
-        yAxis: {
-            title: { text: 'Humidity (%)' }
-        },
+        
         subtitle: {
             text: 'Seleccione el rango a convenir'
         },
@@ -323,7 +321,7 @@
         var objGen = {};
         objGen[sensor] = [];
         var objInd = {};
-        fetch('/datos')
+        fetch('historial/datos/')
         .then(response => {
             if(response.ok){
                 response.json().then(datosjson =>{
@@ -346,7 +344,7 @@
 
     function btDescTotal(){
         
-        fetch('/datos')
+        fetch('historial/datos/')
         .then(response => {
             if(response.ok){
                 response.json().then(datosjson =>{
@@ -378,7 +376,7 @@
 
     function btHist(){
         
-        fetch('/datos')
+        fetch('historial/datos/')
         .then(response => {
             if(response.ok){
                 response.json().then(datosjson =>{

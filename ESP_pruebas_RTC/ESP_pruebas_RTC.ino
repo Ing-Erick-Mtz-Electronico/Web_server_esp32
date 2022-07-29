@@ -27,8 +27,20 @@ void setup () {
 }
  
 void loop () {
- now = rtc.now();
- sprintf(str, "%02d-%02d-%02dT%02d:%02d:%02d",  now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
- Serial.println(str);
+ 
+ Serial.println(fecha());
  delay(3000);
+}
+
+String fecha() {
+  now = rtc.now();
+  if (isnan(now)) {
+    Serial.println("Failed to read from BME280 sensor!");
+    return "";
+  }
+  else {
+    sprintf(str, "%02d-%02d-%02dT%02d:%02d:%02d",  now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+    Serial.println(str);
+    return str;
+  }
 }
