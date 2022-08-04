@@ -4,11 +4,14 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
-    
-    <script src="https://code.highcharts.com/stock/highstock.js"></script>
-    <script src="https://code.highcharts.com/stock/modules/data.js"></script>
-    <script src="https://code.highcharts.com/modules/accessibility.js"></script>
+ 
+    <link href="./lib/bootstrap/css/bootstrap.min.css" rel="stylesheet" type="text/css">
+    <script src="./lib/bootstrap/js/bootstrap.min.js"></script>    
+    <script src="./lib/highstock/highstock.js"></script>
+    <!-- <script src="./lib/highstock/accessibility.js"></script> -->
+    <script src="./lib/highstock/data.js"></script>
+    <link rel="icon" href="data:,">
+      
     
     <title>HISTORIAL</title>
 
@@ -39,9 +42,9 @@
 
     <div  class="card card-body bg-dark text-white p-1 mx-auto m-5" style="width: 33rem;">
         <label class="h3 text-center m-4">Seleccione el sensor de su interes</label>
-                <select class="form-control mx-auto text-center" style="width: 15rem;">
-                    <option value="temperatura">Presion atmosferica (hPa)</option>
-                    <option value="Presion">Temperatura (°C)</option>
+                <select id="list-sensor" class="form-control mx-auto text-center" style="width: 15rem;">
+                    <option value="presion">Presion atmosferica (hPa)</option>
+                    <option value="temperatura">Temperatura (°C)</option>
                     <option value="humedad">Humedad</option>
                     <option value="altitud">Altitud</option>
                 </select>
@@ -55,13 +58,13 @@
     
     <div class="mx-auto row" style="background:rgb(204, 26, 26);">
         
-        <div id="chart-temperature" class="m-2 col-5" ></div>
-        <div id="chart-humidity" class="m-2 col-5" ></div>
-        <div id="chart-pressure" class="m-2 col-5" ></div>
-        <div id="chart-altitude" class="m-2 col-5" ></div>
+        <div id="chart-temperature" class="m-2 col-sm-5" ></div>
+        <div id="chart-humidity" class="m-2 col-sm-5" ></div>
+        <div id="chart-pressure" class="m-2 col-sm-5" ></div>
+        <div id="chart-altitude" class="m-2 col-sm-5" ></div>
 
     </div>
- 
+    
 </body> 
 
 <script>
@@ -317,17 +320,18 @@
     }
 
     function btDescSen(){
-        const sensor = document.querySelector('.list-sensor').value;
+        const sensor = document.querySelector('#list-sensor').value;
+        
         var objGen = {};
         objGen[sensor] = [];
         var objInd = {};
-        fetch('historial/datos/')
+        fetch('/variables')
         .then(response => {
             if(response.ok){
                 response.json().then(datosjson =>{
                     datosjson.mediciones.forEach(sen => {
                         objInd.medicion = sen[sensor];
-                        objInd.fecha = e.fecha;
+                        objInd.fecha = sen.fecha;
                         objGen[sensor].push(objInd)
                     });
 
@@ -344,11 +348,11 @@
 
     function btDescTotal(){
         
-        fetch('historial/datos/')
+        fetch('/variables')
         .then(response => {
             if(response.ok){
                 response.json().then(datosjson =>{
-                    download('Datos_Total.json',JSON.stringify(objGen));
+                    download('Datos_Total.json',JSON.stringify(datosjson));
                 });
 
             }}).catch(() =>{
@@ -376,13 +380,12 @@
 
     function btHist(){
         
-        fetch('historial/datos/')
+        fetch('/variables')
         .then(response => {
             if(response.ok){
                 response.json().then(datosjson =>{
                     data = extData('temperatura',datosjson);
                     data.forEach(plot => {
-                        console.log(charT);
                         charT.series[0].addPoint(plot, true, false, true);
                     }); 
 
