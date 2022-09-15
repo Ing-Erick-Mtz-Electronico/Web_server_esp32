@@ -16,11 +16,11 @@ void setup () {
   delay(1000);
  
   // Comprobamos si tenemos el RTC conectado
-  if (! rtc.begin()) {
+  
+  while(! rtc.begin()){
     Serial.println("No hay un módulo RTC");
-    while (1);
-  }
-   
+    delay(1000);
+    } 
   // Ponemos en hora, solo la primera vez, luego comentar y volver a cargar.
   // Ponemos en hora con los valores de la fecha y la hora en que el sketch ha sido compilado.
   rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
@@ -34,13 +34,10 @@ void loop () {
 
 String fecha() {
   now = rtc.now();
-  if (isnan(now)) {
-    Serial.println("Failed to read from BME280 sensor!");
-    return "";
-  }
-  else {
-    sprintf(str, "%02d-%02d-%02dT%02d:%02d:%02d",  now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
-    Serial.println(str);
-    return str;
-  }
+  
+ 
+  sprintf(str, "%02d-%02d-%02dT%02d:%02d:%02d",  now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+  Serial.println(str);
+  return str;
+  
 }

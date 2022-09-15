@@ -1,6 +1,7 @@
 
+// Código para la bolla
+//Lib Servidor
 #include <AsyncEventSource.h>
-
 #include <AsyncWebSocket.h>
 #include <AsyncWebSynchronization.h>
 #include <ESPAsyncWebServer.h>
@@ -10,8 +11,7 @@
 #include <WebHandlerImpl.h>
 #include <WebResponseImpl.h>
 
- 
-
+//Lib Wifi
 #include <WiFi.h>
 #include <WiFiAP.h>
 #include <WiFiClient.h>
@@ -23,20 +23,9 @@
 #include <WiFiType.h>
 #include <WiFiUdp.h>
 
-
-
-
-
-#include <SPIFFS.h>
-
-
-
-//#include <WebServer.h>
-
-//#include <ESPAsyncWebServer.h>
-
-//#include <WiFi.h>
-//#include <WebServer.h>
+#include <SPIFFS.h> //acceder al sistem file
+ 
+//lib SPI
 #include <SPI.h>
 #include <SD.h>
 #include <sd_defines.h>
@@ -46,25 +35,54 @@
 #include <vfs_api.h>
 
 #include <Wire.h>
-#include <RTClib.h>
- 
+#include <RTClib.h> //lib RTC
+
+//variables para el sensor PH
+#define addressPH 99//0x63              //default I2C ID number for EZO pH Circuit.
+byte codePH = 0;                   //used to hold the I2C response code.
+char ph_data[20];               //we make a 20 byte character array to hold incoming data from the RTD circuit.
+byte in_charPH = 0;                //used as a 1 byte buffer to store in bound bytes from the RTD Circuit.
+byte iPH = 0;                      //counter used for ph_data array.
+int time_PH = 900;                 //used to change the delay needed depending on the command sent to the EZO Class RTD Circuit.
+float ph_float;                 //float var used to hold the float value of the RTD.
+//---------------------
+
+//variables para el sensor EC conductividad
+#define addressEC 0x64              //default I2C ID number for EZO EC Circuit.
+byte codeEC = 0;                   //used to hold the I2C response code.
+char ec_data[20];               //we make a 20 byte character array to hold incoming data from the RTD circuit.
+byte in_charEC = 0;                //used as a 1 byte buffer to store in bound bytes from the RTD Circuit.
+byte iEC = 0;                      //counter used for ec_data array.
+int time_EC = 600;                 //used to change the delay needed depending on the command sent to the EZO Class RTD Circuit.600
+float ec_float;                 //float var used to hold the float value of the RTD
+//---------------------------
+
+//variables para el sensor RTC Temperatura
+#define addressRTD 0x66              
+byte codeRTD = 0;                   
+char rtd_data[20];               
+byte in_charRTD = 0;                
+byte iRTD = 0;                     
+int time_RTD = 600;                
+float rtd_float;                 
+//---------------------------
+
+
 // Declaramos un RTC DS3231
 RTC_DS1307 rtc;
 DateTime now;
 char str[20];
 String fecha_data = "";
 
-// Código para la bolla
-
 #include <Adafruit_BME280.h>
 
 #define SEALEVELPRESSURE_HPA (1013.25)
-#define PATH ("/prueba6.json")
+#define PATH ("/prueba7.json")
 #define BME_ADDRESS (0x76)
 
 Adafruit_BME280 bme;
 
-String temperature, humidity, pressure, altitude;
+String temperature, humidity, pressure, altitude, PH, EC, RTD;
 int counter = 0;
 
 // Creamos nuestra propia red -> SSID & Password
@@ -72,7 +90,6 @@ const char* ssid = "GIDEAMSERVER";
 const char* password = "1234567890";
 
 //Servidor
-//WebServer server(80);
 AsyncWebServer server(80);
 
 //Millis
@@ -261,39 +278,140 @@ String fecha() {
   return str;
   
 }
-/*
-//----------respuesta de rutas--------------
-void inicio() {
-  server.send(SPIFFS, "/index.html");
-}
-void tiempoReal() {
-  server.send(SPIFFS, "/tiempo_real.html");
-}
 
-void tiemporealTemperature() {
-  server.send(200, "text/plain", readBME280Temperature().c_str());
-}
-void tiemporealHumidity() {
-  server.send(200, "text/plain", readBME280Humidity().c_str());
-}
-void tiemporealPressure() {
-  server.send(200, "text/plain", readBME280Pressure().c_str());
-}
-void tiemporealAltitude() {
-  server.send(200, "text/plain", readBME280Altitude().c_str());
-}
-void historial() {
-  server.send(SPIFFS, "/historial.html");
-}
-void historialDatos() {
-  String leer = leerArchivo(SD, PATH);
-  server.send(200, "text/plain",leer.c_str());
-}
+String sensorPH(){
+  boolean flag = true;
+  
+  Wire.beginTransmission(addressPH);                                              //call the circuit by its ID number.
+  Wire.write("R \n");                                                     //transmit the command that was sent through the serial port.
+  Wire.endTransmission();                                                       //end the I2C data transmission.
 
-void handleNotFound(){
-  server.send(404, "text/plain", "{\"message\":\"URL failed\"}");
-}
-*/
+  while (flag){
+    
+    delay(time_PH);                                                               //wait the correct amount of time for the circuit to complete its instruction.
+    Wire.requestFrom(addressPH, 20, 1);                                           //call the circuit and request 20 bytes (this may be more than we need)
+    codePH = Wire.read();
+    
+    switch (codePH) {                       //switch case based on what the response code is.
+      case 1:                             //decimal 1.
+        Serial.println("Success");        //means the command was successful.
+        while (Wire.available()) {            //are there bytes to receive.
+          in_charPH = Wire.read();              //receive a byte.
+          ph_data[iPH] = in_charPH;              //load this byte into our array.
+          iPH += 1;                             //incur the counter for the array element.
+          if (in_charPH == 0) {                 //if we see that we have been sent a null command.
+            iPH = 0;                            //reset the counter i to 0.
+            break;                            //exit the while loop.
+          }
+        }
+        
+        //Serial.println("pH: " + String(ph_data));             //print the data.
+        
+        return String(ph_data);
+                                
+      case 2:                             //decimal 2.
+        Serial.println("Failed");         //means the command has failed.
+        return String("0.000");
+        
+  
+      case 254:                           //decimal 254.
+        Serial.println("Pending");        //means the command has not yet been finished calculating.
+        break;                            //exits the switch case.
+  
+      case 255:                           //decimal 255.
+        Serial.println("No Data");        //means there is no further data to send.
+        return String("0.000");
+    }
+    } 
+  }
+
+String sensorEC(){
+  boolean flag = true;
+  
+  Wire.beginTransmission(addressEC);                                              //call the circuit by its ID number.
+  Wire.write("R \n");                                                     //transmit the command that was sent through the serial port.
+  Wire.endTransmission();                                                       //end the I2C data transmission.
+
+  while (flag){
+    
+    delay(time_EC);                                                               //wait the correct amount of time for the circuit to complete its instruction.
+  
+    Wire.requestFrom(addressEC, 20, 1);                                           //call the circuit and request 20 bytes (this may be more than we need)
+    codeEC = Wire.read();                                                         //the first byte is the response code, we read this separately.
+  
+    switch (codeEC) {                       //switch case based on what the response code is.
+      case 1:                             //decimal 1.
+        Serial.println("Success");        //means the command was successful.
+        while (Wire.available()) {            //are there bytes to receive.
+          in_charEC = Wire.read();              //receive a byte.
+          ec_data[iEC] = in_charEC;              //load this byte into our array.
+          iEC += 1;                             //incur the counter for the array element.
+          if (in_charEC == 0) {                 //if we see that we have been sent a null command.
+            iEC = 0;                            //reset the counter i to 0.
+            break;                            //exit the while loop.
+          }
+        }
+        return String(ec_data);
+      case 2:                             //decimal 2.
+        Serial.println("Failed");         //means the command has failed.
+        return String("0.000");                            //exits the switch case.
+  
+      case 254:                           //decimal 254.
+        Serial.println("Pending");        //means the command has not yet been finished calculating.
+        break;                            //exits the switch case.
+  
+      case 255:                           //decimal 255.
+        Serial.println("No Data");        //means there is no further data to send.
+        return String("0.000");
+    }
+  
+    //Serial.println("EC: " + String(ec_data));             //print the data.
+    } 
+  }
+
+String sensorRTD(){
+  boolean flag = true;
+  
+  Wire.beginTransmission(addressRTD);                                              //call the circuit by its ID number.
+  Wire.write("R \n");                                                     //transmit the command that was sent through the serial port.
+  Wire.endTransmission();                                                       //end the I2C data transmission.
+
+  while (flag){
+    
+    delay(time_RTD);                                                               //wait the correct amount of time for the circuit to complete its instruction.
+  
+    Wire.requestFrom(addressRTD, 20, 1);                                           //call the circuit and request 20 bytes (this may be more than we need)
+    codeRTD = Wire.read();                                                         //the first byte is the response code, we read this separately.
+  
+    switch (codeRTD) {                       //switch case based on what the response code is.
+      case 1:                             //decimal 1.
+        Serial.println("Success");        //means the command was successful.
+        while (Wire.available()) {            //are there bytes to receive.
+          in_charRTD = Wire.read();              //receive a byte.
+          rtd_data[iRTD] = in_charRTD;              //load this byte into our array.
+          iRTD += 1;                             //incur the counter for the array element.
+          if (in_charRTD == 0) {                 //if we see that we have been sent a null command.
+            iRTD = 0;                            //reset the counter i to 0.
+            break;                            //exit the while loop.
+          }
+        }
+        return String(rtd_data);
+      case 2:                             //decimal 2.
+        Serial.println("Failed");         //means the command has failed.
+        return String("0.000");                            //exits the switch case.
+  
+      case 254:                           //decimal 254.
+        Serial.println("Pending");        //means the command has not yet been finished calculating.
+        break;                            //exits the switch case.
+  
+      case 255:                           //decimal 255.
+        Serial.println("No Data");        //means there is no further data to send.
+        return String("0.000");
+    }
+  
+    //Serial.println("EC: " + String(ec_data));             //print the data.
+    } 
+  }
 //----------------------------------------------
 
 void setup() {
@@ -304,7 +422,8 @@ void setup() {
   while(!Serial) {
     Serial.print("."); // Espera hasta que el puerto serial se conecte
   }
-
+  Wire.begin();                 //enable I2C port.
+  
   // Creamos el punto de acceso
   WiFi.softAP(ssid, password); // Tiene mas parametros opcionales
   IPAddress ip = WiFi.softAPIP();
@@ -314,23 +433,7 @@ void setup() {
 
   
   //Servicios
-/*
-  //-----------------------------------------
-  server.on("/", inicio);
-  
-  server.on("tiemporeal/",tiempoReal);
 
-  server.on("tiemporeal/temperature/",tiemporealTemperature);
-  server.on("tiemporeal/humidity/",tiemporealHumidity);
-  server.on("tiemporeal/pressure/",tiemporealPressure);
-  server.on("tiemporeal/altitude/",tiemporealAltitude);
-  
-  server.on("historial/",historial);
-  server.on("historial/datos/",historialDatos);
-  
-  server.onNotFound(handleNotFound);
-  //-----------------------------------------
-  */
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(SPIFFS, "/index.html");
   });
@@ -360,27 +463,23 @@ void setup() {
     request->send_P(200, "text/plain",leerArchivo(SD, PATH).c_str());
   });
   
-  server.on("/lib/bootstrap/css/bootstrap.min.css", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/lib/bootstrap/css/bootstrap.min.css");
-  });
-  server.on("/lib/bootstrap/js/bootstrap.min.js", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/lib/bootstrap/js/bootstrap.min.js");
-  });
+
   server.on("/lib/highstock/highstock.js", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(SPIFFS, "/lib/highstock/highstock.js");
   });
   server.on("/lib/highstock/data.js", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(SPIFFS, "/lib/highstock/data.js");
   });
-  server.on("/lib/highstock/highcharts.js", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/lib/highstock/highcharts.js");
+  server.on("/lib/highstock/accessibility.js", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/lib/highstock/accessibility.js");
+  });
+  server.on("/lib/highstock/data.js.map", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/lib/highstock/data.js.map");
   });
   
   server.begin();
   Serial.println("Servidor HTTP iniciado");
   delay(150);
-  
-  //Iniciando servidor
   
   if(!SPIFFS.begin(true)){
     Serial.println("sistema de archivos SPIFFS fallida");
@@ -432,6 +531,9 @@ void loop() {
     pressure = readBME280Pressure();
     altitude = readBME280Altitude();
     fecha_data = fecha();
+    PH = sensorPH();
+    EC = sensorEC();
+    RTD = sensorRTD();
     
     Serial.print("Temperatura = "); 
     Serial.println(temperature);
@@ -443,9 +545,16 @@ void loop() {
     Serial.println(altitude);
     Serial.print("fecha = ");
     Serial.println(fecha_data);
+    Serial.print("ph = ");
+    Serial.println(PH);
+    Serial.print("EC = ");
+    Serial.println(EC);
+    Serial.print("RTD = ");
+    Serial.println(RTD);
+
     
     String object_med = "{";
-    object_med.concat("\"temperatura\":");
+    object_med.concat("\"tambiente\":");
     object_med.concat(temperature);
     object_med.concat(",\"humedad\":");
     object_med.concat(humidity);
@@ -453,6 +562,12 @@ void loop() {
     object_med.concat(pressure);
     object_med.concat(",\"altitud\":");
     object_med.concat(altitude);
+    object_med.concat(",\"ph\":");
+    object_med.concat(PH);
+    object_med.concat(",\"conductividad\":");
+    object_med.concat(EC);
+    object_med.concat(",\"tagua\":");
+    object_med.concat(RTD);
     
     object_med.concat(",\"fecha\":");
     object_med.concat(fecha_data);
