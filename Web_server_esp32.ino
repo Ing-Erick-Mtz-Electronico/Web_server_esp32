@@ -1,5 +1,4 @@
-
-// Código para la bolla
+// Código para la boya
 //Lib Servidor
 #include <AsyncEventSource.h>
 #include <AsyncWebSocket.h>
@@ -24,7 +23,7 @@
 #include <WiFiUdp.h>
 
 #include <SPIFFS.h> //acceder al sistem file
- 
+
 //lib SPI
 #include <SPI.h>
 #include <SD.h>
@@ -35,7 +34,9 @@
 #include <vfs_api.h>
 
 #include <Wire.h>
+#include "SHT21.h"
 #include <RTClib.h> //lib RTC
+#include <Adafruit_BME280.h>
 
 //variables para el sensor PH
 #define addressPH 99//0x63              //default I2C ID number for EZO pH Circuit.
@@ -58,13 +59,13 @@ float ec_float;                 //float var used to hold the float value of the 
 //---------------------------
 
 //variables para el sensor RTC Temperatura
-#define addressRTD 0x66              
-byte codeRTD = 0;                   
-char rtd_data[20];               
-byte in_charRTD = 0;                
-byte iRTD = 0;                     
-int time_RTD = 600;                
-float rtd_float;                 
+#define addressRTD 0x66
+byte codeRTD = 0;
+char rtd_data[20];
+byte in_charRTD = 0;
+byte iRTD = 0;
+int time_RTD = 600;
+float rtd_float;
 //---------------------------
 
 
@@ -74,19 +75,20 @@ DateTime now;
 char str[20];
 String fecha_data = "";
 
-#include <Adafruit_BME280.h>
-
 #define SEALEVELPRESSURE_HPA (1013.25)
-#define PATH ("/prueba7.json")
+#define PATH ("/prueba1.json")
 #define BME_ADDRESS (0x76)
 
 Adafruit_BME280 bme;
 
-String temperature, humidity, pressure, altitude, PH, EC, RTD;
+// Sensor de temperatura y humedad SHT21
+SHT21 SHT21;
+
+String temperature, humidity, pressure, altitude, PH, EC, RTD, tempsht, humsht;
 int counter = 0;
 
 // Creamos nuestra propia red -> SSID & Password
-const char* ssid = "GIDEAMSERVER";  
+const char* ssid = "GIDEAMSERVER";
 const char* password = "1234567890";
 
 //Servidor
@@ -98,19 +100,19 @@ const long intervalo = 10000;
 
 //---------funciones----------------------------
 
-String leerArchivo(fs::FS &fs, const char * path){
+String leerArchivo(fs::FS &fs, const char * path) {
   String payload;
   Serial.printf("Reading file: %s\n", path);
 
   File file = fs.open(path);
-  if(file){
-    while(file.available()){
+  if (file) {
+    while (file.available()) {
       char ch = file.read();
       payload += String(ch);
     }
     file.close();
     int tamanio = payload.length();
-    payload[tamanio-1] = ']';
+    payload[tamanio - 1] = ']';
     payload += '}';
     Serial.println("enviados--------------------------");
     //Serial.println(payload);
@@ -118,21 +120,21 @@ String leerArchivo(fs::FS &fs, const char * path){
   } else {
     Serial.println("Failed to open file for reading");
     return "{\"message\":\"error\"}";
-  } 
+  }
 }
 
-boolean checkChar(fs::FS &fs, const char * path,const char ch){
+boolean checkChar(fs::FS &fs, const char * path, const char ch) {
   File file = fs.open(path);
-  
-  if(!file){
+
+  if (!file) {
     Serial.println("Failed to open file for reading");
     return false;
   }
 
   Serial.print("Read from file for check char: ");
-  while(file.available()){
+  while (file.available()) {
     char mychar = file.read();
-    if(mychar == ch){
+    if (mychar == ch) {
       file.close();
       return true;
     }
@@ -141,33 +143,33 @@ boolean checkChar(fs::FS &fs, const char * path,const char ch){
   return false;
 }
 
-boolean checkFile(fs::FS &fs, const char * path){
-  
+boolean checkFile(fs::FS &fs, const char * path) {
+
   File file = fs.open(path);
-  if(!file){
+  if (!file) {
     Serial.println("Failed to open file for reading");
     file.close();
     return false;
   }
-  
+
   Serial.printf("verificando archivo: %s\n", path);
-  if(file.available()){
+  if (file.available()) {
     file.close();
     return true;
   }
-   
+
 }
 
-void deleteFile(fs::FS &fs, const char * path){
+void deleteFile(fs::FS &fs, const char * path) {
   Serial.printf("Deleting file: %s\n", path);
-  if(fs.remove(path)){
+  if (fs.remove(path)) {
     Serial.println("File deleted");
   } else {
     Serial.println("Delete failed");
   }
 }
 
-void writeFile(fs::FS &fs, const char * path,const String mensaje) {
+void writeFile(fs::FS &fs, const char * path, const String mensaje) {
   Serial.printf("Escribiendo el archivo: %s\n", path);
 
   File file = fs.open(path, FILE_WRITE);
@@ -183,42 +185,55 @@ void writeFile(fs::FS &fs, const char * path,const String mensaje) {
   file.close();
 }
 
-void readFile(fs::FS &fs, const char * path){
+void readFile(fs::FS &fs, const char * path) {
   Serial.printf("Reading file: %s\n", path);
   //String reed = "";
   File file = fs.open(path);
-  
-  if(!file){
+
+  if (!file) {
     Serial.println("Failed to open file for reading");
     return;
   }
 
   Serial.print("Read from file: ");
-  while(file.available()){
+  while (file.available()) {
     //char mychar = file.read();
     //reed.concat(mychar);
     Serial.write(file.read());
   }
   //Serial.println(reed);
-  
+
   file.close();
   //return reed;
 }
 
-void appendFile(fs::FS &fs, const char * path, const char * message){
+void appendFile(fs::FS &fs, const char * path, const char * message) {
   Serial.printf("Appending to file: %s\n", path);
 
   File file = fs.open(path, FILE_APPEND);
-  if(!file){
+  if (!file) {
     Serial.println("Failed to open file for appending");
     return;
   }
-  if(file.print(message)){
-      Serial.println("Message appended");
+  if (file.print(message)) {
+    Serial.println("Message appended");
   } else {
     Serial.println("Append failed");
   }
   file.close();
+}
+
+String readSHT21Temperatura() {
+  float temp = SHT21.getTemperature();
+  if (isnan(temp)) {
+    Serial.println("Error al leer la temperatura del SHT21");
+    return "";
+  }
+  else {
+    Serial.println(temp);
+    return String(temp);
+  }
+
 }
 
 String readBME280Temperature() {
@@ -226,7 +241,7 @@ String readBME280Temperature() {
   float t = bme.readTemperature();
   // Convert temperature to Fahrenheit
   //t = 1.8 * t + 32;
-  if (isnan(t)) {    
+  if (isnan(t)) {
     Serial.println("Failed to read from BME280 sensor!");
     return "";
   }
@@ -261,7 +276,7 @@ String readBME280Pressure() {
 }
 String readBME280Altitude() {
   float a = bme.readAltitude(SEALEVELPRESSURE_HPA);
-  
+
   if (isnan(a)) {
     Serial.println("Failed to read from BME280 sensor!");
     return "";
@@ -276,22 +291,22 @@ String fecha() {
   sprintf(str, "\"%02d-%02d-%02dT%02d:%02d:%02d\"",  now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
   Serial.println(str);
   return str;
-  
+
 }
 
-String sensorPH(){
+String sensorPH() {
   boolean flag = true;
-  
+
   Wire.beginTransmission(addressPH);                                              //call the circuit by its ID number.
   Wire.write("R \n");                                                     //transmit the command that was sent through the serial port.
   Wire.endTransmission();                                                       //end the I2C data transmission.
 
-  while (flag){
-    
+  while (flag) {
+
     delay(time_PH);                                                               //wait the correct amount of time for the circuit to complete its instruction.
     Wire.requestFrom(addressPH, 20, 1);                                           //call the circuit and request 20 bytes (this may be more than we need)
     codePH = Wire.read();
-    
+
     switch (codePH) {                       //switch case based on what the response code is.
       case 1:                             //decimal 1.
         Serial.println("Success");        //means the command was successful.
@@ -304,41 +319,41 @@ String sensorPH(){
             break;                            //exit the while loop.
           }
         }
-        
+
         //Serial.println("pH: " + String(ph_data));             //print the data.
-        
+
         return String(ph_data);
-                                
+
       case 2:                             //decimal 2.
         Serial.println("Failed");         //means the command has failed.
         return String("0.000");
-        
-  
+
+
       case 254:                           //decimal 254.
         Serial.println("Pending");        //means the command has not yet been finished calculating.
         break;                            //exits the switch case.
-  
+
       case 255:                           //decimal 255.
         Serial.println("No Data");        //means there is no further data to send.
         return String("0.000");
     }
-    } 
   }
+}
 
-String sensorEC(){
+String sensorEC() {
   boolean flag = true;
-  
+
   Wire.beginTransmission(addressEC);                                              //call the circuit by its ID number.
   Wire.write("R \n");                                                     //transmit the command that was sent through the serial port.
   Wire.endTransmission();                                                       //end the I2C data transmission.
 
-  while (flag){
-    
+  while (flag) {
+
     delay(time_EC);                                                               //wait the correct amount of time for the circuit to complete its instruction.
-  
+
     Wire.requestFrom(addressEC, 20, 1);                                           //call the circuit and request 20 bytes (this may be more than we need)
     codeEC = Wire.read();                                                         //the first byte is the response code, we read this separately.
-  
+
     switch (codeEC) {                       //switch case based on what the response code is.
       case 1:                             //decimal 1.
         Serial.println("Success");        //means the command was successful.
@@ -355,34 +370,34 @@ String sensorEC(){
       case 2:                             //decimal 2.
         Serial.println("Failed");         //means the command has failed.
         return String("0.000");                            //exits the switch case.
-  
+
       case 254:                           //decimal 254.
         Serial.println("Pending");        //means the command has not yet been finished calculating.
         break;                            //exits the switch case.
-  
+
       case 255:                           //decimal 255.
         Serial.println("No Data");        //means there is no further data to send.
         return String("0.000");
     }
-  
-    //Serial.println("EC: " + String(ec_data));             //print the data.
-    } 
-  }
 
-String sensorRTD(){
+    //Serial.println("EC: " + String(ec_data));             //print the data.
+  }
+}
+
+String sensorRTD() {
   boolean flag = true;
-  
+
   Wire.beginTransmission(addressRTD);                                              //call the circuit by its ID number.
   Wire.write("R \n");                                                     //transmit the command that was sent through the serial port.
   Wire.endTransmission();                                                       //end the I2C data transmission.
 
-  while (flag){
-    
+  while (flag) {
+
     delay(time_RTD);                                                               //wait the correct amount of time for the circuit to complete its instruction.
-  
+
     Wire.requestFrom(addressRTD, 20, 1);                                           //call the circuit and request 20 bytes (this may be more than we need)
     codeRTD = Wire.read();                                                         //the first byte is the response code, we read this separately.
-  
+
     switch (codeRTD) {                       //switch case based on what the response code is.
       case 1:                             //decimal 1.
         Serial.println("Success");        //means the command was successful.
@@ -399,31 +414,64 @@ String sensorRTD(){
       case 2:                             //decimal 2.
         Serial.println("Failed");         //means the command has failed.
         return String("0.000");                            //exits the switch case.
-  
+
       case 254:                           //decimal 254.
         Serial.println("Pending");        //means the command has not yet been finished calculating.
         break;                            //exits the switch case.
-  
+
       case 255:                           //decimal 255.
         Serial.println("No Data");        //means there is no further data to send.
         return String("0.000");
     }
-  
+
     //Serial.println("EC: " + String(ec_data));             //print the data.
-    } 
   }
+}
+
+
+void listDir(fs::FS &fs, const char * dirname, uint8_t levels) {
+  Serial.printf("Listing directory: %s\r\n", dirname);
+
+  File root = fs.open(dirname);
+  if (!root) {
+    Serial.println("- failed to open directory");
+    return;
+  }
+  if (!root.isDirectory()) {
+    Serial.println(" - not a directory");
+    return;
+  }
+
+  File file = root.openNextFile();
+  while (file) {
+    if (file.isDirectory()) {
+      Serial.print("  DIR : ");
+      Serial.println(file.name());
+      if (levels) {
+        listDir(fs, file.path(), levels - 1);
+      }
+    } else {
+      Serial.print("  FILE: ");
+      Serial.print(file.name());
+      Serial.print("\tSIZE: ");
+      Serial.println(file.size());
+    }
+    file = root.openNextFile();
+  }
+}
+
 //----------------------------------------------
 
 void setup() {
 
   String init = "{\"mediciones\":[";
-  
+
   Serial.begin(115200);
-  while(!Serial) {
+  while (!Serial) {
     Serial.print("."); // Espera hasta que el puerto serial se conecte
   }
   Wire.begin();                 //enable I2C port.
-  
+
   // Creamos el punto de acceso
   WiFi.softAP(ssid, password); // Tiene mas parametros opcionales
   IPAddress ip = WiFi.softAPIP();
@@ -431,89 +479,96 @@ void setup() {
   Serial.print("Nombre de mi red esp32: ");
   Serial.println(ssid);
 
-  
+
   //Servicios
 
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
     request->send(SPIFFS, "/index.html");
   });
-  
-  
-  server.on("/tiemporeal", HTTP_GET, [](AsyncWebServerRequest *request){
+
+
+  server.on("/tiemporeal", HTTP_GET, [](AsyncWebServerRequest * request) {
     request->send(SPIFFS, "/tiempo_real.html");
   });
-  
-  server.on("/temperature", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/plain", readBME280Temperature().c_str());
+
+  server.on("/tempsht", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send_P(200, "text/plain", readSHT21Temperatura().c_str());
   });
-  server.on("/humidity", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/plain", readBME280Humidity().c_str());
-  });
-  server.on("/pressure", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/plain", readBME280Pressure().c_str());
-  });
-  server.on("/altitude", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/plain", readBME280Altitude().c_str());
-  });
-  
-  server.on("/historial", HTTP_GET, [](AsyncWebServerRequest *request){
+
+  //  server.on("/temperature", HTTP_GET, [](AsyncWebServerRequest * request) {
+  //    request->send_P(200, "text/plain", readBME280Temperature().c_str());
+  //  });
+  //  server.on("/humidity", HTTP_GET, [](AsyncWebServerRequest * request) {
+  //    request->send_P(200, "text/plain", readBME280Humidity().c_str());
+  //  });
+  //  server.on("/pressure", HTTP_GET, [](AsyncWebServerRequest * request) {
+  //    request->send_P(200, "text/plain", readBME280Pressure().c_str());
+  //  });
+  //  server.on("/altitude", HTTP_GET, [](AsyncWebServerRequest * request) {
+  //    request->send_P(200, "text/plain", readBME280Altitude().c_str());
+  //  });
+
+  server.on("/historial", HTTP_GET, [](AsyncWebServerRequest * request) {
     request->send(SPIFFS, "/historial.html");
   });
-  server.on("/variables", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/plain",leerArchivo(SD, PATH).c_str());
-  });
-  
+  //  server.on("/variables", HTTP_GET, [](AsyncWebServerRequest * request) {
+  //    request->send_P(200, "text/plain", leerArchivo(SD, PATH).c_str());
+  //  });
 
-  server.on("/lib/highstock/highstock.js", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/lib/highstock/highstock.js");
-  });
-  server.on("/lib/highstock/data.js", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/lib/highstock/data.js");
-  });
-  server.on("/lib/highstock/accessibility.js", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/lib/highstock/accessibility.js");
-  });
-  server.on("/lib/highstock/data.js.map", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(SPIFFS, "/lib/highstock/data.js.map");
-  });
-  
+
+  //  server.on("/lib/highstock/highstock.js", HTTP_GET, [](AsyncWebServerRequest * request) {
+  //    request->send(SPIFFS, "/lib/highstock/highstock.js");
+  //  });
+  //  server.on("/lib/highstock/data.js", HTTP_GET, [](AsyncWebServerRequest * request) {
+  //    request->send(SPIFFS, "/lib/highstock/data.js");
+  //  });
+  //  server.on("/lib/highstock/accessibility.js", HTTP_GET, [](AsyncWebServerRequest * request) {
+  //    request->send(SPIFFS, "/lib/highstock/accessibility.js");
+  //  });
+  //  server.on("/lib/highstock/data.js.map", HTTP_GET, [](AsyncWebServerRequest * request) {
+  //    request->send(SPIFFS, "/lib/highstock/data.js.map");
+  //  });
+
   server.begin();
   Serial.println("Servidor HTTP iniciado");
   delay(150);
-  
-  if(!SPIFFS.begin(true)){
+
+  if (!SPIFFS.begin(true)) {
     Serial.println("sistema de archivos SPIFFS fallida");
     delay(2000);
   }
   Serial.println("Inicialización SPIFFS lista.");
-  
+
+  listDir(SPIFFS, "/", 0);
   Serial.print("Inicializando SD card...");
-  while(!SD.begin(5)) {
+  while (!SD.begin(5)) {
     Serial.println("Inicialización fallida!");
     delay(2000);
   }
-  Serial.println("Inicialización lista.");
+  Serial.println("Inicialización SD lista.");
 
-  while(!rtc.begin()){
-    Serial.println("No hay un módulo RTC conectado");
-    delay(2000);
-    }
-  Serial.println("RTC conectada");
-  
-  while(!bme.begin(BME_ADDRESS)){
-    Serial.println("No hay un módulo BME conectado");
-    delay(2000);
-    }
-  Serial.println("BME conectado");
-  
-  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  
-  //deleteFile(SD, PATH);
-  if(checkFile(SD, PATH)){
-    if(!checkChar(SD, PATH, '[')){
+  SHT21.begin();
+
+  //  while (!rtc.begin()) {
+  //    Serial.println("No hay un módulo RTC conectado");
+  //    delay(2000);
+  //  }
+  //  Serial.println("RTC conectada");
+
+  //  while (!bme.begin(BME_ADDRESS)) {
+  //    Serial.println("No hay un módulo BME conectado");
+  //    delay(2000);
+  //  }
+  //  Serial.println("BME conectado");
+  //
+  //  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+
+  deleteFile(SD, PATH);
+  if (checkFile(SD, PATH)) {
+    if (!checkChar(SD, PATH, '[')) {
       writeFile(SD, PATH, init.c_str());
     }
-  }else{
+  } else {
     writeFile(SD, PATH, init.c_str());
   }
 }
@@ -526,61 +581,67 @@ void loop() {
   if (currentMillis - previousMillis >= intervalo && counter <= 50) {
     // save the last time you blinked the LED
     previousMillis = currentMillis;
-    temperature = readBME280Temperature();
-    humidity = readBME280Humidity();
-    pressure = readBME280Pressure();
-    altitude = readBME280Altitude();
-    fecha_data = fecha();
-    PH = sensorPH();
-    EC = sensorEC();
-    RTD = sensorRTD();
-    
-    Serial.print("Temperatura = "); 
-    Serial.println(temperature);
-    Serial.print("Humedad = "); 
-    Serial.println(humidity);
-    Serial.print("Presion = ");
-    Serial.println(pressure);
-    Serial.print("Altitud = ");
-    Serial.println(altitude);
-    Serial.print("fecha = ");
-    Serial.println(fecha_data);
-    Serial.print("ph = ");
-    Serial.println(PH);
-    Serial.print("EC = ");
-    Serial.println(EC);
-    Serial.print("RTD = ");
-    Serial.println(RTD);
-
-    
+    tempsht = readSHT21Temperatura();
+    //    temperature = readBME280Temperature();
+    //    humidity = readBME280Humidity();
+    //    pressure = readBME280Pressure();
+    //    altitude = readBME280Altitude();
+    //    fecha_data = fecha();
+    //    PH = sensorPH();
+    //    EC = sensorEC();
+    //    RTD = sensorRTD();
+    //
+    Serial.print("Temperatura SHT21 = ");
+    Serial.println(tempsht);
+    //    Serial.print("Temperatura = ");
+    //    Serial.println(temperature);
+    //    Serial.print("Humedad = ");
+    //    Serial.println(humidity);
+    //    Serial.print("Presion = ");
+    //    Serial.println(pressure);
+    //    Serial.print("Altitud = ");
+    //    Serial.println(altitude);
+    //    Serial.print("fecha = ");
+    //    Serial.println(fecha_data);
+    //    Serial.print("ph = ");
+    //    Serial.println(PH);
+    //    Serial.print("EC = ");
+    //    Serial.println(EC);
+    //    Serial.print("RTD = ");
+    //    Serial.println(RTD);
+    //
+    //
     String object_med = "{";
-    object_med.concat("\"tambiente\":");
-    object_med.concat(temperature);
-    object_med.concat(",\"humedad\":");
-    object_med.concat(humidity);
-    object_med.concat(",\"presion\":");
-    object_med.concat(pressure);
-    object_med.concat(",\"altitud\":");
-    object_med.concat(altitude);
-    object_med.concat(",\"ph\":");
-    object_med.concat(PH);
-    object_med.concat(",\"conductividad\":");
-    object_med.concat(EC);
-    object_med.concat(",\"tagua\":");
-    object_med.concat(RTD);
-    
-    object_med.concat(",\"fecha\":");
-    object_med.concat(fecha_data);
+    object_med.concat("\"t_SHT21\":");
+    object_med.concat(tempsht);
+    //    String object_med = "{";
+    //    object_med.concat("\"tambiente\":");
+    //    object_med.concat(temperature);
+    //    object_med.concat(",\"humedad\":");
+    //    object_med.concat(humidity);
+    //    object_med.concat(",\"presion\":");
+    //    object_med.concat(pressure);
+    //    object_med.concat(",\"altitud\":");
+    //    object_med.concat(altitude);
+    //    object_med.concat(",\"ph\":");
+    //    object_med.concat(PH);
+    //    object_med.concat(",\"conductividad\":");
+    //    object_med.concat(EC);
+    //    object_med.concat(",\"tagua\":");
+    //    object_med.concat(RTD);
+    //
+    //    object_med.concat(",\"fecha\":");
+    //    object_med.concat(fecha_data);
     object_med.concat("}");
     object_med.concat(",");
-    
+    //
     appendFile(SD, PATH, object_med.c_str());
-    //readFile(SD, PATH);
+    readFile(SD, PATH);
     counter++;
-  }  
+  }
   //delay(10000);
-  
+
   //readFile(SD, PATH);
   //Serial.print("\n");
-  
+
 }
